@@ -9,21 +9,35 @@ import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.experimental.UtilityClass;
+import static backend.academy.util.ColorUtils.COLOR_MAX_VALUE;
 
 @UtilityClass
 public class FractalGeneratorUtils {
-    private static final int MAX_COLOR_VALUE = 255;
+    private static final int POINT_CAPACITY_2 = 2;
+    private static final int POINT_CAPACITY_4 = 4;
 
+    /**
+     * Генерирует симметричные точки на основе исходной точки
+     *
+     * @param original исходная точка
+     * @param centerX  X центра симметрии
+     * @param centerY  Y центра симметрии
+     * @param symmetryType тип симметрии {@link SymmetryType}.
+     * @return список симметричных точек
+     */
     public static List<Point> generateSymmetricPoints(
         Point original,
         double centerX,
         double centerY,
         SymmetryType symmetryType
     ) {
+        if (symmetryType == null) {
+            return List.of(original);
+        }
+
         List<Point> points = new ArrayList<>(switch (symmetryType) {
-            case NONE -> 1;
-            case HORIZONTAL, VERTICAL, RADIAL_2 -> 2;
-            case BOTH, RADIAL_4 -> 4;
+            case HORIZONTAL, VERTICAL, RADIAL_2 -> POINT_CAPACITY_2;
+            case BOTH, RADIAL_4 -> POINT_CAPACITY_4;
         });
 
         points.add(original);
@@ -45,14 +59,19 @@ public class FractalGeneratorUtils {
                 points.add(new Point(original.x(), centerY - dy));
                 points.add(new Point(centerX - dx, centerY - dy));
             }
-            default -> {
-
-            }
+            default -> { }
         }
 
         return points;
     }
 
+    /**
+     * Выполняет смешивание текущего пикселя с цветом преобразования
+     *
+     * @param currentPixel текущий пиксель {@link Pixel}.
+     * @param transformColor цвет преобразования {@link Color}.
+     * @return новый пиксель
+     */
     public static Pixel blendPixels(Pixel currentPixel, Color transformColor) {
         if (currentPixel.hitCount() == 0) {
             return new Pixel(
@@ -71,69 +90,42 @@ public class FractalGeneratorUtils {
         );
     }
 
+    /**
+     * Отображает точку на фрактальном изображении, применяя цвет преобразования
+     *
+     * @param canvas холст {@link FractalImage}
+     * @param world область мира {@link Rect}
+     * @param point точка для отображения {@link Point}
+     * @param transformColor цвет преобразования {@link Color}
+     */
     public static void renderPoint(
         FractalImage canvas,
         Rect world,
         Point point,
         Color transformColor
     ) {
-        if (!world.contains(point)) {
-            return;
+        if (world.contains(point)) {
+            int x = (int) ((point.x() - world.x()) / world.width() * canvas.width());
+            int y = (int) ((point.y() - world.y()) / world.height() * canvas.height());
+
+            if (canvas.contains(x, y)) {
+                Pixel currentPixel = canvas.pixel(x, y);
+                Pixel updatedPixel = blendPixels(currentPixel, transformColor);
+
+                canvas.setPixel(x, y, updatedPixel);
+            }
         }
-
-        int x = (int) ((point.x() - world.x()) / world.width() * canvas.width());
-        int y = (int) ((point.y() - world.y()) / world.height() * canvas.height());
-
-        if (!canvas.contains(x, y)) {
-            return;
-        }
-
-        Pixel currentPixel = canvas.pixel(x, y);
-        Pixel updatedPixel = blendPixels(currentPixel, transformColor);
-
-        canvas.setPixel(x, y, updatedPixel);
     }
 
+    /**
+     * Рассчитывает смешанный цвет с учетом количества попаданий
+     *
+     * @param currentColor текущий цвет (r, g или b)
+     * @param newColor новый цвет (r, g или b)
+     * @param hitCount количество попаданий для текущего пикселя
+     * @return смешанный цвет [0, 255]
+     */
     public static int calculateBlendedColor(int currentColor, int newColor, int hitCount) {
-        return Math.min(MAX_COLOR_VALUE, (currentColor * hitCount + newColor) / (hitCount + 1));
-    }
-
-    public record RendererMetrics(
-        long totalTimeMs,
-        int threadCount,
-        Runtime runtime,
-        int samples,
-        int iterPerSample,
-        String generatorType
-    ) {
-        @Override
-        public String toString() {
-            return String.format("""
-                    Rendering Metrics:
-                    Generator Type: %s
-                    System Configuration:
-                        Available processors: %d
-                        Max memory: %d MB
-                        Free memory: %d MB
-                        Total memory: %d MB
-                    Execution Details:
-                        Thread count: %d
-                        Total samples: %d
-                        Iterations per sample: %d
-                        Total execution time: %d ms
-                        Average time per sample: %.2f ms
-                    """,
-                generatorType,
-                runtime.availableProcessors(),
-                runtime.maxMemory() / (1024 * 1024),
-                runtime.freeMemory() / (1024 * 1024),
-                runtime.totalMemory() / (1024 * 1024),
-                threadCount,
-                samples,
-                iterPerSample,
-                totalTimeMs,
-                (double) totalTimeMs / samples
-            );
-        }
+        return Math.min(COLOR_MAX_VALUE, (currentColor * hitCount + newColor) / (hitCount + 1));
     }
 }

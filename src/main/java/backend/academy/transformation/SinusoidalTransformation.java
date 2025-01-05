@@ -7,4 +7,9 @@ public class SinusoidalTransformation implements Transformation {
     public Point apply(Point p) {
         return new Point(Math.sin(p.x()), Math.sin(p.y()));
     }
+
+    @Override
+    public String name() {
+        return "Sinusoidal";
+    }
 }

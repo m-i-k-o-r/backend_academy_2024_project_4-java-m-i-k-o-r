@@ -51,6 +51,9 @@
         <!-- CLI -->
         <jcommander.version>1.84</jcommander.version>
 
+        <!-- GUI -->
+        <lanterna.version>3.1.1</lanterna.version>
+
         <!-- Apache Commons -->
         <commons-lang3.version>3.14.0</commons-lang3.version>
         <commons-codec.version>1.17.0</commons-codec.version>
@@ -112,6 +115,13 @@
             <groupId>org.jcommander</groupId>
             <artifactId>jcommander</artifactId>
         </dependency>
+
+        <!-- GUI -->
+        <dependency>
+            <groupId>com.googlecode.lanterna</groupId>
+            <artifactId>lanterna</artifactId>
+        </dependency>
+
         <!-- Apache Commons -->
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -271,6 +281,13 @@
                 <groupId>org.jcommander</groupId>
                 <artifactId>jcommander</artifactId>
                 <version>${jcommander.version}</version>
+            </dependency>
+
+            <!-- GUI -->
+            <dependency>
+                <groupId>com.googlecode.lanterna</groupId>
+                <artifactId>lanterna</artifactId>
+                <version>${lanterna.version}</version>
             </dependency>
 
             <!-- Apache Commons -->
@@ -470,6 +487,15 @@
 
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>exec-maven-plugin</artifactId>
+                    <version>3.5.0</version>
+                    <configuration>
+                        <mainClass>backend.academy.Main</mainClass>
+                    </configuration>
+                </plugin>
+
                 <!-- Core -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

@@ -4,7 +4,9 @@ import backend.academy.transformation.Transformation;
 import backend.academy.transformation.wrapper.Wrapper;
 import java.util.List;
 import java.util.Random;
+import lombok.experimental.UtilityClass;
 
+@UtilityClass
 public class WrapperUtils {
     public static <T extends Transformation> Wrapper<T> choose(
         Random random,
@@ -31,7 +33,7 @@ public class WrapperUtils {
             .sum();
 
         if (totalWeight == 0) {
-            throw new IllegalArgumentException(" ! Сумма весов не может ровняться 0");
+            throw new IllegalArgumentException("Сумма весов не может ровняться 0");
         }
 
         return wrappers.stream()

@@ -8,8 +8,9 @@ public record Rect(double x, double y, double width, double height) {
     }
 
     public Point randomPoint(Random random) {
-        double x = this.x + random.nextDouble() * width;
-        double y = this.y + random.nextDouble() * height;
-        return new Point(x, y);
+        return new Point(
+            this.x + random.nextDouble() * width,
+            this.y + random.nextDouble() * height
+        );
     }
 }

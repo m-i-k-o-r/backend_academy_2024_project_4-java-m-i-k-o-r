@@ -9,15 +9,13 @@ import backend.academy.transformation.AffineTransformation;
 import backend.academy.transformation.Transformation;
 import backend.academy.transformation.wrapper.Wrapper;
 import backend.academy.util.WrapperUtils;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.awt.Color;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.IntStream;
-import static backend.academy.util.FractalGeneratorUtils.RendererMetrics;
 import static backend.academy.util.FractalGeneratorUtils.generateSymmetricPoints;
 import static backend.academy.util.FractalGeneratorUtils.renderPoint;
 
@@ -25,15 +23,17 @@ public class MultiThreadGenerator implements FractalGenerator {
     private static final int SEQUENTIAL_THRESHOLD = 1000;
 
     private final SymmetryType symmetryType;
-    private final int threadCount;
     private final ForkJoinPool threadPool;
 
     private Point center;
 
     public MultiThreadGenerator(SymmetryType symmetryType, int threadCount) {
         this.symmetryType = symmetryType;
-        this.threadCount = threadCount <= 0 ? Runtime.getRuntime().availableProcessors() : threadCount;
-        this.threadPool = new ForkJoinPool(this.threadCount);
+        this.threadPool = new ForkJoinPool(
+            threadCount <= 0
+                ? Runtime.getRuntime().availableProcessors()
+                : threadCount
+        );
     }
 
     @Override
@@ -46,7 +46,6 @@ public class MultiThreadGenerator implements FractalGenerator {
         int iterPerSample,
         long seed
     ) {
-        Instant startTime = Instant.now();
         center = new Point(
             world.x() + world.width() / 2,
             world.y() + world.height() / 2
@@ -63,22 +62,10 @@ public class MultiThreadGenerator implements FractalGenerator {
         } finally {
             threadPool.shutdown();
         }
-
-        Instant endTime = Instant.now();
-        long totalTimeMs = Duration.between(startTime, endTime).toMillis();
-
-        System.out.println(new RendererMetrics(
-            totalTimeMs,
-            threadCount,
-            Runtime.getRuntime(),
-            samples,
-            iterPerSample,
-            "Multi Thread Generator"
-        ));
-
         return canvas;
     }
 
+    @SuppressWarnings("RecordComponentNumber")
     private record RenderConfig(
         FractalImage canvas,
         Rect world,
@@ -90,12 +77,13 @@ public class MultiThreadGenerator implements FractalGenerator {
         int end,
         SymmetryType symmetryType
     ) {
+
     }
 
     private class RenderTask extends RecursiveAction {
         private final RenderConfig config;
 
-        public RenderTask(RenderConfig config) {
+        private RenderTask(RenderConfig config) {
             this.config = config;
         }
 
@@ -122,6 +110,8 @@ public class MultiThreadGenerator implements FractalGenerator {
             );
         }
 
+        // PREDICTABLE_RANDOM
+        @SuppressFBWarnings
         private void processSamplesSequentially() {
             ThreadLocalRandom random = ThreadLocalRandom.current();
             IntStream.range(config.start(), config.end()).forEach(i -> processOneSample(random));
@@ -136,16 +126,19 @@ public class MultiThreadGenerator implements FractalGenerator {
         }
 
         private Point processOneIteration(Point point, ThreadLocalRandom random) {
+            Point currentPoint = point;
+
             Wrapper<AffineTransformation> affine = WrapperUtils.choose(random, config.affine());
-            point = affine.transformation().apply(point);
+            currentPoint = affine.transformation().apply(currentPoint);
+
             Color transformColor = affine.color();
 
             Wrapper<Transformation> variation = WrapperUtils.choose(random, config.variations());
-            point = variation.transformation().apply(point);
+            currentPoint = variation.transformation().apply(currentPoint);
 
-            renderSymmetricPoints(point, transformColor);
+            renderSymmetricPoints(currentPoint, transformColor);
 
-            return point;
+            return currentPoint;
         }
 
         private void renderSymmetricPoints(Point point, Color transformColor) {

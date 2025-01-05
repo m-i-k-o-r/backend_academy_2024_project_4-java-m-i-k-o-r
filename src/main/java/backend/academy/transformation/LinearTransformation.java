@@ -7,4 +7,9 @@ public class LinearTransformation implements Transformation {
     public Point apply(Point p) {
         return new Point(p.x(), p.y());
     }
+
+    @Override
+    public String name() {
+        return "Linear";
+    }
 }

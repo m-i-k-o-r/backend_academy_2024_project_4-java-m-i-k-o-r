@@ -4,62 +4,71 @@ import backend.academy.effects.ImageProcessor;
 import backend.academy.effects.NormalizeProcessor;
 import backend.academy.image.FractalGenerator;
 import backend.academy.image.FractalImage;
-import backend.academy.image.ImageUtils;
 import backend.academy.image.generators.MultiThreadGenerator;
 import backend.academy.image.generators.SingleThreadGenerator;
+import backend.academy.model.FractalGenerationContext;
+import backend.academy.model.Metrics;
 import backend.academy.model.Rect;
+import backend.academy.saver.BMPImageSaver;
+import backend.academy.saver.ImageSaver;
+import backend.academy.saver.JPEGImageSaver;
+import backend.academy.saver.PNGImageSaver;
 import backend.academy.transformation.AffineTransformation;
 import backend.academy.transformation.Transformation;
 import backend.academy.transformation.factory.AffineFactory;
 import backend.academy.transformation.factory.VariationFactory;
 import backend.academy.transformation.generator.AffineGenerator;
 import backend.academy.transformation.wrapper.Wrapper;
-import backend.academy.ui.ParameterPicker;
-import backend.academy.ui.ThreadPicker;
-import backend.academy.ui.UiComponent;
 import com.googlecode.lanterna.gui2.WindowBasedTextGUI;
 import com.googlecode.lanterna.gui2.dialogs.MessageDialogBuilder;
-import java.awt.Color;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Random;
 import static backend.academy.util.StringUtils.generateFilename;
 import static backend.academy.util.StringUtils.getDurationTime;
 
+/**
+ * Сервис для генерации фракталов
+ * <br>
+ * Выполняет основную работу по генерации, обработке и сохранению фрактала
+ */
 public class FractalService {
     private static final Rect WORLD = new Rect(-1, -1, 2, 2);
 
+    /**
+     * Генерирует фрактал на основе переданных параметров
+     *
+     * @param context параметры {@link FractalGenerationContext}
+     * @param textGUI граф интерфейс для отображения уведомлений
+     * @throws Exception ошибка во время генерации или сохранения
+     */
     public void generate(
-        UiComponent<ParameterPicker.Parameters> parameterPicker,
-        UiComponent<List<Transformation>> variationsPicker,
-        UiComponent<List<ImageProcessor>> processorPicker,
-        UiComponent<Color> backgroundColorPicker,
-        UiComponent<List<Color>> paletteColorPicker,
-        UiComponent<ThreadPicker.Type> threadPicker,
+        FractalGenerationContext context,
         WindowBasedTextGUI textGUI
     ) throws Exception {
-        ParameterPicker.Parameters params = parameterPicker.getSelected();
-        ThreadPicker.Type type = threadPicker.getSelected();
-        Random random = createSecureRandom(params.seed());
+        Random random = createSecureRandom(context.parameters().seed());
 
-        FractalImage canvas = FractalImage.create(params.width(), params.height());
-        List<Color> palette = paletteColorPicker.getSelected();
-        List<Wrapper<AffineTransformation>> affineTransforms = generateAffineTransforms(random, palette, params);
+        FractalImage canvas = FractalImage.create(
+            context.parameters().width(),
+            context.parameters().height()
+        );
+        List<Wrapper<AffineTransformation>> affineTransforms = generateAffineTransforms(random, context);
+        List<Wrapper<Transformation>> variations = getVariations(random, context);
 
-        List<Wrapper<Transformation>> variations = getVariations(random, variationsPicker);
+        Instant startTime = Instant.now();
 
-        long startTime = System.nanoTime();
+        FractalImage fractal = renderFractal(canvas, affineTransforms, variations, context);
+        processFractalImage(canvas, context);
+        String filename = saveFractal(fractal, context);
 
-        FractalImage fractal = renderFractal(canvas, affineTransforms, variations, params, type);
+        Instant endTime = Instant.now();
+        long totalTimeMs = Duration.between(startTime, endTime).toMillis();
 
-        processFractalImage(canvas, processorPicker.getSelected());
-
-        String filename = saveFractal(fractal, backgroundColorPicker.getSelected(), params);
-
-        long endTime = System.nanoTime();
-        String durationTime = getDurationTime(startTime, endTime);
-        notifyAboutCompletion(textGUI, filename, durationTime);
+        notifyAboutCompletionInWindow(textGUI, filename, totalTimeMs);
+        notifyAboutCompletionInConsole(filename, totalTimeMs, context);
     }
 
     private SecureRandom createSecureRandom(long seed) throws NoSuchAlgorithmException {
@@ -68,71 +77,158 @@ public class FractalService {
         return secureRandom;
     }
 
+    /**
+     * Создает список преобразований {@link AffineTransformation}
+     *
+     * @param random ну {@link Random}
+     * @param context параметры генерации фрактала {@link FractalGenerationContext}
+     * @return список преобразований, завернутых в {@link Wrapper}
+     */
     private List<Wrapper<AffineTransformation>> generateAffineTransforms(
         Random random,
-        List<Color> palette,
-        ParameterPicker.Parameters params
+        FractalGenerationContext context
     ) {
-        return new AffineFactory(random, palette).wrap(
-            new AffineGenerator(random).generate(params.samples())
+        return new AffineFactory(random, context.paletteColors()).wrap(
+            new AffineGenerator(random).generate(context.parameters().samples())
         );
     }
 
+    /**
+     * Получает список вариаций трансформаций
+     *
+     * @param random ну {@link Random}
+     * @param context параметры генерации фрактала {@link FractalGenerationContext}
+     * @return список трансформаций, завернутых в {@link Wrapper}.
+     * @throws IllegalArgumentException если переданный список трансформаций пуст
+     */
     private List<Wrapper<Transformation>> getVariations(
         Random random,
-        UiComponent<List<Transformation>> variationsPicker
+        FractalGenerationContext context
     ) {
-        List<Transformation> selectedVariations = variationsPicker.getSelected();
-        if (selectedVariations.isEmpty()) {
+        List<Transformation> variations = context.variations();
+        if (variations.isEmpty()) {
             throw new IllegalArgumentException("Выберите хотя бы одну трансформацию");
         }
-        return new VariationFactory(random).wrap(selectedVariations);
+        return new VariationFactory(random).wrap(variations);
     }
 
+    /**
+     * Рендерит изображение фрактала
+     *
+     * @param canvas холст
+     * @param affineTransforms список аффинных преобразований
+     * @param variations список трансформаций
+     * @param context параметры генерации фрактала
+     * @return сгенерированное изображение фрактала {@link FractalImage}.
+     */
     private FractalImage renderFractal(
         FractalImage canvas,
         List<Wrapper<AffineTransformation>> affineTransforms,
         List<Wrapper<Transformation>> variations,
-        ParameterPicker.Parameters params,
-        ThreadPicker.Type type
+        FractalGenerationContext context
     ) {
-        FractalGenerator generator = type.isMultithreading()
-            ? new MultiThreadGenerator(params.symmetry(), type.threadCount())
-            : new SingleThreadGenerator(params.symmetry());
+        FractalGenerator generator = context.thread().isMultithreading()
+            ? new MultiThreadGenerator(context.symmetry(), context.thread().threadCount())
+            : new SingleThreadGenerator(context.symmetry());
 
         return generator.generate(
             canvas,
             WORLD,
             affineTransforms,
             variations,
-            params.samples(),
-            params.iterations(),
-            params.seed()
+            context.parameters().samples(),
+            context.parameters().iterations(),
+            context.parameters().seed()
         );
     }
 
-    private void processFractalImage(FractalImage canvas, List<ImageProcessor> processors) {
+    /**
+     * Обрабатывает изображение фрактала
+     *
+     * @param canvas холст
+     * @param context параметры генерации фрактала
+     */
+    private void processFractalImage(FractalImage canvas, FractalGenerationContext context) {
         new NormalizeProcessor().process(canvas);
+
+        List<ImageProcessor> processors = context.processors();
         for (ImageProcessor processor : processors) {
             processor.process(canvas);
         }
     }
 
+    /**
+     * Сохраняет изображение фрактала
+     *
+     * @param fractal изображение
+     * @param context параметры генерации фрактала
+     * @return имя сохраненного файла
+     * @throws Exception ошибка во время сохранения
+     */
     private String saveFractal(
         FractalImage fractal,
-        Color backgroundColor,
-        ParameterPicker.Parameters params
+        FractalGenerationContext context
     ) throws Exception {
-        String filename = generateFilename(params.format());
-        ImageUtils.save(fractal, backgroundColor, filename, params.format());
+        String filename = generateFilename(context.format());
+
+        ImageSaver imageSaver = switch (context.format()) {
+            case PNG -> new PNGImageSaver(context.thread().threadCount());
+            case JPEG -> new JPEGImageSaver(context.thread().threadCount());
+            case BMP -> new BMPImageSaver(context.thread().threadCount());
+        };
+        imageSaver.save(fractal, context.backgroundColor(), filename);
+
         return filename;
     }
 
-    private void notifyAboutCompletion(WindowBasedTextGUI textGUI, String filename, String durationTime) {
+    /**
+     * Показывает сообщение о завершении генерации в графическом интерфейсе
+     *
+     * @param textGUI интерфейс для отображения сообщений
+     * @param filename имя сохраненного файла
+     * @param totalTimeMs время выполнения (мс)
+     */
+    private void notifyAboutCompletionInWindow(WindowBasedTextGUI textGUI, String filename, long totalTimeMs) {
         new MessageDialogBuilder()
             .setTitle("Генерация завершена")
-            .setText("Фрактал успешно сгенерирован за " + durationTime + " ms\nФайл сохранен: " + filename)
-            .build()
+            .setText(
+                "Фрактал успешно сгенерирован за "
+                    + getDurationTime(totalTimeMs)
+                    + " ms\nФайл сохранен: "
+                    + filename
+            ).build()
             .showDialog(textGUI);
+    }
+
+    /**
+     * Выводит сообщение о завершении генерации в консоль
+     *
+     * @param filename имя сохраненного файла
+     * @param totalTimeMs время выполнения (мс)
+     * @param context параметры генерации фрактала
+     */
+    private void notifyAboutCompletionInConsole(String filename, long totalTimeMs, FractalGenerationContext context) {
+        new Metrics(
+            filename,
+            totalTimeMs,
+            !context.thread().isMultithreading()
+                ? 1
+                : context.thread().threadCount() > 0
+                    ? context.thread().threadCount()
+                    : Runtime.getRuntime().availableProcessors(),
+            Runtime.getRuntime(),
+            context.parameters().samples(),
+            context.parameters().iterations(),
+            !context.thread().isMultithreading()
+                ? "Single Thread Generator"
+                : "Multi Thread Generator",
+            context.parameters().seed(),
+            context.format(),
+            context.symmetry(),
+            context.variations(),
+            context.processors(),
+            context.backgroundColor(),
+            context.paletteColors()
+        ).print();
     }
 }

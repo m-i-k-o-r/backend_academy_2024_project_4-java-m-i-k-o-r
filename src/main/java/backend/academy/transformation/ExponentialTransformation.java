@@ -12,4 +12,9 @@ public class ExponentialTransformation implements Transformation {
             factor * Math.sin(Math.PI * p.y())
         );
     }
+
+    @Override
+    public String name() {
+        return "Exponential";
+    }
 }

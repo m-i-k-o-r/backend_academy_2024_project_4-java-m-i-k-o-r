@@ -16,8 +16,9 @@ public class VariationFactory implements TransformationFactory<Transformation> {
 
     @Override
     public List<Wrapper<Transformation>> wrap(List<Transformation> transformations) {
-        List<Wrapper<Transformation>> wrappers = new ArrayList<>();
+        List<Wrapper<Transformation>> wrappers = new ArrayList<>(transformations.size());
         for (Transformation transformation : transformations) {
+            transformation.random(random);
             double weight = random.nextDouble();
             wrappers.add(new Wrapper<>(transformation, weight, null));
         }

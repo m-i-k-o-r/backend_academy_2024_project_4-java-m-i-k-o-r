@@ -5,7 +5,12 @@ import lombok.AllArgsConstructor;
 
 @AllArgsConstructor
 public class AffineTransformation implements Transformation {
-    private final double a, b, c, d, e, f;
+    private final double a;
+    private final double b;
+    private final double c;
+    private final double d;
+    private final double e;
+    private final double f;
 
     @Override
     public Point apply(Point point) {

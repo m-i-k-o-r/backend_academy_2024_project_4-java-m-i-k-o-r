@@ -11,16 +11,30 @@ import static backend.academy.util.ColorUtils.generateColor;
 
 public class AffineFactory implements TransformationFactory<AffineTransformation> {
     private final Random random;
+    private final List<Color> paletteColors;
+
+    public AffineFactory(Random random, List<Color> paletteColors) {
+        this.random = random;
+        this.paletteColors = paletteColors;
+    }
 
     public AffineFactory(Random random) {
         this.random = random;
+        this.paletteColors = new ArrayList<>();
     }
 
     public List<Wrapper<AffineTransformation>> wrap(List<AffineTransformation> transformations) {
-        List<Wrapper<AffineTransformation>> wrappers = new ArrayList<>();
+        List<Wrapper<AffineTransformation>> wrappers = new ArrayList<>(transformations.size());
         for (AffineTransformation transformation : transformations) {
             double weight = random.nextDouble();
-            Color color = generateColor(random);
+
+            Color color;
+            if (paletteColors.isEmpty()) {
+                color = generateColor(random);
+            } else {
+                Color baseColor = paletteColors.get(random.nextInt(paletteColors.size()));
+                color = generateColor(random, baseColor);
+            }
             wrappers.add(new Wrapper<>(transformation, weight, color));
         }
         return WrapperUtils.normalize(wrappers);

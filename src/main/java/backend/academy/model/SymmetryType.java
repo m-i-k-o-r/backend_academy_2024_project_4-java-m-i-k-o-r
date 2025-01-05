@@ -4,7 +4,6 @@ import lombok.Getter;
 
 @Getter
 public enum SymmetryType {
-    NONE("Нет"),
     HORIZONTAL("Горизонтальная"),
     VERTICAL("Вертикальная"),
     BOTH("Горизонтальная и вертикальная"),
@@ -16,5 +15,4 @@ public enum SymmetryType {
     SymmetryType(String description) {
         this.description = description;
     }
-
 }

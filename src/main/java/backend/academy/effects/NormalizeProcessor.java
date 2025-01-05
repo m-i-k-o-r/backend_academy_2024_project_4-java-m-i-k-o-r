@@ -1,7 +1,8 @@
 package backend.academy.effects;
 
-import backend.academy.FractalImage;
+import backend.academy.image.FractalImage;
 import backend.academy.model.Pixel;
+import static backend.academy.util.ColorUtils.COLOR_MAX_VALUE;
 
 public class NormalizeProcessor implements ImageProcessor {
     @Override
@@ -19,7 +20,8 @@ public class NormalizeProcessor implements ImageProcessor {
 
                 int intensity = 0;
                 if (maxHitCount > 0) {
-                    intensity = (int) (255 * Math.log10(1 + pixel.hitCount()) / Math.log10(1 + maxHitCount));
+                    intensity = (int) (COLOR_MAX_VALUE * Math.log10(1 + pixel.hitCount())
+                        / Math.log10(1 + maxHitCount));
                 }
 
                 Pixel newPixel = new Pixel(

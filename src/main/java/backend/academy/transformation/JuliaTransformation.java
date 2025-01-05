@@ -1,12 +1,12 @@
 package backend.academy.transformation;
 
 import backend.academy.model.Point;
-import lombok.AllArgsConstructor;
 import java.util.Random;
+import lombok.AllArgsConstructor;
 
 @AllArgsConstructor
 public class JuliaTransformation implements Transformation {
-    private final Random random;
+    private Random random;
 
     @Override
     public Point apply(Point p) {
@@ -18,5 +18,15 @@ public class JuliaTransformation implements Transformation {
             Math.sqrt(r) * Math.cos(theta / 2 + omega),
             Math.sqrt(r) * Math.sin(theta / 2 + omega)
         );
+    }
+
+    @Override
+    public String name() {
+        return "Julia";
+    }
+
+    @Override
+    public void random(Random random) {
+        this.random = random;
     }
 }
